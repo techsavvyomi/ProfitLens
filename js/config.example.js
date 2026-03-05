@@ -4,7 +4,7 @@
 
 const CONFIG = {
   WEBAPP_URL: '__WEBAPP_URL__',
-  REFRESH_INTERVAL: 2000,
+  REFRESH_INTERVAL: 500,
   CATEGORIES: [
     'Food', 'Bike', 'Home', 'EMI', 'Savings',
     'Investment', 'CreditCard', 'Utilities', 'Shopping', 'Other'
