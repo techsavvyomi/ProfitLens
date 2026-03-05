@@ -22,12 +22,13 @@ async function apiGet(action, params = {}) {
 async function apiPost(body) {
   body.pin = getPin();
 
-  const response = await fetch(CONFIG.WEBAPP_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-    redirect: 'follow'
-  });
+  // Use GET with payload param to avoid CORS/redirect issues on mobile
+  const url = new URL(CONFIG.WEBAPP_URL);
+  url.searchParams.set('pin', getPin());
+  url.searchParams.set('action', 'write');
+  url.searchParams.set('payload', JSON.stringify(body));
+
+  const response = await fetch(url.toString(), { redirect: 'follow' });
   const data = await response.json();
 
   if (data.error === 'unauthorized') {

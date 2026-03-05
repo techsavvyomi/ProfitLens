@@ -5,7 +5,7 @@
 const CONFIG = {
   // Deploy Code.gs as Web App, paste the URL here
   WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbxEi4c3vOrfxSj4lXNA8kDNJowOTV-XuQz6K_Z06eHCpOclKk7Rz7ykwlh2Z6dmnKLt8A/exec',
-  REFRESH_INTERVAL: 5 * 60 * 1000,
+  REFRESH_INTERVAL: 2000,
   CATEGORIES: [
     'Food', 'Bike', 'Home', 'EMI', 'Savings',
     'Investment', 'CreditCard', 'Utilities', 'Shopping', 'Other'

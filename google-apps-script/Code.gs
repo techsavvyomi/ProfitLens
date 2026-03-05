@@ -59,6 +59,9 @@ function doGet(e) {
       case 'sip':
         return jsonResponse(getSheetData('SIP'));
 
+      case 'write':
+        return handleWrite(e.parameter.payload);
+
       default:
         return jsonResponse({ error: 'Unknown action: ' + action });
     }
@@ -106,6 +109,48 @@ function doPost(e) {
 
       default:
         return jsonResponse({ error: 'Unknown action' });
+    }
+  } catch (err) {
+    return jsonResponse({ error: err.message });
+  }
+}
+
+function handleWrite(payload) {
+  try {
+    var data = JSON.parse(payload);
+    var writeAction = data.action || 'addExpense';
+
+    switch (writeAction) {
+      case 'addExpense':
+        addExpenseRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'addEMI':
+        addEMIRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'deleteEMI':
+        deleteSheetRow('EMI', parseInt(data.rowIndex));
+        return jsonResponse({ status: 'ok' });
+
+      case 'addSIP':
+        addSIPRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'deleteSIP':
+        deleteSheetRow('SIP', parseInt(data.rowIndex));
+        return jsonResponse({ status: 'ok' });
+
+      case 'updateExpense':
+        updateExpenseRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'deleteExpense':
+        deleteExpenseRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      default:
+        return jsonResponse({ error: 'Unknown write action: ' + writeAction });
     }
   } catch (err) {
     return jsonResponse({ error: err.message });
