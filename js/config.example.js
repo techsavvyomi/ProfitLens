@@ -1,10 +1,9 @@
-// Configuration
-// Set WEBAPP_URL after deploying Code.gs as Web App
-// No Sheet ID needed here — everything goes through the Apps Script
+// Configuration Template
+// Copy this file to config.js and fill in your values
+// DO NOT commit config.js to git
 
 const CONFIG = {
-  // Deploy Code.gs as Web App, paste the URL here
-  WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbxEi4c3vOrfxSj4lXNA8kDNJowOTV-XuQz6K_Z06eHCpOclKk7Rz7ykwlh2Z6dmnKLt8A/exec',
+  WEBAPP_URL: '__WEBAPP_URL__',
   REFRESH_INTERVAL: 2000,
   CATEGORIES: [
     'Food', 'Bike', 'Home', 'EMI', 'Savings',

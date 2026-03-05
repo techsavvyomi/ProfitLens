@@ -23,6 +23,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Generate config.js from secret
+        run: sed "s|__WEBAPP_URL__|${WEBAPP_URL}|g" js/config.example.js > js/config.js
+        env:
+          WEBAPP_URL: ${{ secrets.WEBAPP_URL }}
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
