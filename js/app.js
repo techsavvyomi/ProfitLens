@@ -1,5 +1,5 @@
 import { CONFIG, getMonthSheetName, getPreviousMonthSheetName, getRecentMonths, formatCurrency, getTodayFormatted } from './config.js';
-import { fetchMonthlyExpenses, fetchAccounts, submitExpense, updateExpense, deleteExpenseEntry } from './sheetFetcher.js';
+import { fetchMonthlyExpenses, fetchAccounts, submitExpense, updateExpense, deleteExpenseEntry, submitTransfer } from './sheetFetcher.js';
 import { getTotalExpenses, getCategoryTotals, getMonthlySummary, getAccountBalances } from './dashboard.js';
 import { renderPieChart, renderLineChart, renderBarChart } from './charts.js';
 import { generateInsights, renderInsights } from './insights.js';
@@ -190,6 +190,79 @@ async function loadAccountOptions() {
     });
   } catch (err) {
     console.warn('Could not load accounts:', err.message);
+  }
+}
+
+function initTransferForm() {
+  const toggleBtn = document.getElementById('toggleTransferForm');
+  const form = document.getElementById('transferForm');
+  if (!toggleBtn || !form) return;
+
+  toggleBtn.addEventListener('click', () => {
+    form.classList.toggle('hidden');
+    toggleBtn.classList.toggle('active');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('transferSubmitBtn');
+    const statusEl = document.getElementById('transferStatus');
+
+    const fromAccount = document.getElementById('transferFrom').value;
+    const toAccount = document.getElementById('transferTo').value;
+    const amount = document.getElementById('transferAmount').value;
+    const notes = document.getElementById('transferNotes').value;
+
+    if (!fromAccount || !toAccount || !amount) {
+      statusEl.textContent = 'Please fill all required fields';
+      statusEl.className = 'submit-status error';
+      return;
+    }
+
+    if (fromAccount === toAccount) {
+      statusEl.textContent = 'From and To accounts must be different';
+      statusEl.className = 'submit-status error';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Transferring...';
+
+    try {
+      await submitTransfer({ fromAccount, toAccount, amount, notes });
+      statusEl.textContent = 'Transfer recorded!';
+      statusEl.className = 'submit-status success';
+      form.reset();
+      form.classList.add('hidden');
+      toggleBtn.classList.remove('active');
+      setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'submit-status'; }, 2000);
+      setTimeout(() => loadDashboard(), 1000);
+    } catch (err) {
+      statusEl.textContent = err.message || 'Transfer failed';
+      statusEl.className = 'submit-status error';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Transfer';
+    }
+  });
+}
+
+async function loadTransferAccountOptions() {
+  try {
+    const accounts = await fetchAccounts();
+    const selects = [document.getElementById('transferFrom'), document.getElementById('transferTo')];
+    selects.forEach(select => {
+      if (!select) return;
+      while (select.options.length > 1) select.remove(1);
+      accounts.forEach(acc => {
+        const opt = document.createElement('option');
+        opt.value = acc.account;
+        opt.textContent = acc.account;
+        select.appendChild(opt);
+      });
+    });
+  } catch (err) {
+    console.warn('Could not load transfer accounts:', err.message);
   }
 }
 
@@ -485,6 +558,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initExpenseForm();
     initMonthSelector();
     initTransactionActions();
+    initTransferForm();
+    loadTransferAccountOptions();
     loadDashboard();
 
     setInterval(() => {

@@ -74,7 +74,9 @@ async function fetchEMI() {
     loanAmount: parseFloat(row.LoanAmount) || 0,
     emi: parseFloat(row.EMI) || 0,
     startDate: row.StartDate || '',
-    tenureMonths: parseInt(row.TenureMonths) || 0
+    tenureMonths: parseInt(row.TenureMonths) || 0,
+    deductionDay: row.DeductionDay || '',
+    account: row.Account || ''
   }));
 }
 
@@ -102,10 +104,24 @@ async function submitEMI(emiData) {
   });
 }
 
+async function updateEMI(emiData) {
+  return apiPost({
+    action: 'updateEMI',
+    ...emiData
+  });
+}
+
 async function deleteEMI(rowIndex) {
   return apiPost({
     action: 'deleteEMI',
     rowIndex
+  });
+}
+
+async function submitTransfer(transferData) {
+  return apiPost({
+    action: 'addTransfer',
+    ...transferData
   });
 }
 
@@ -150,4 +166,4 @@ async function verifyLogin(pin) {
   return data.status === 'ok';
 }
 
-export { fetchMonthlyExpenses, fetchAccounts, fetchEMI, fetchSIP, submitExpense, submitEMI, deleteEMI, submitSIP, deleteSIP, updateExpense, deleteExpenseEntry, verifyLogin };
+export { fetchMonthlyExpenses, fetchAccounts, fetchEMI, fetchSIP, submitExpense, submitEMI, updateEMI, deleteEMI, submitSIP, deleteSIP, updateExpense, deleteExpenseEntry, submitTransfer, verifyLogin };

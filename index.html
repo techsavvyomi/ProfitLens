@@ -129,6 +129,30 @@
         <div id="accountBalances" class="account-list"></div>
       </div>
 
+      <!-- Internal Transfer -->
+      <div class="widget">
+        <button type="button" class="transfer-toggle-btn" id="toggleTransferForm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          Transfer Between Accounts
+        </button>
+        <form id="transferForm" class="transfer-form hidden" autocomplete="off">
+          <div class="form-row">
+            <select id="transferFrom" required>
+              <option value="">From Account</option>
+            </select>
+            <select id="transferTo" required>
+              <option value="">To Account</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <input type="number" id="transferAmount" placeholder="Amount" inputmode="decimal" required>
+            <input type="text" id="transferNotes" placeholder="Notes (optional)">
+          </div>
+          <button type="submit" class="submit-btn" id="transferSubmitBtn">Transfer</button>
+          <div class="submit-status" id="transferStatus"></div>
+        </form>
+      </div>
+
       <div class="widget">
         <h3 class="widget-title">Expense Distribution</h3>
         <canvas id="pieChart"></canvas>

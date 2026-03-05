@@ -1,18 +1,45 @@
-import { fetchEMI, submitEMI, deleteEMI } from './sheetFetcher.js';
+import { fetchEMI, fetchAccounts, fetchMonthlyExpenses, submitEMI, updateEMI, deleteEMI } from './sheetFetcher.js';
 import { calculateEMI, renderEMICards } from './emi.js';
+import { getAccountBalances } from './dashboard.js';
+import { getMonthSheetName } from './config.js';
 import { initAuth } from './auth.js';
+
+let currentEMIData = [];
 
 async function loadEMIPage() {
   const container = document.getElementById('emiCards');
   if (container) container.innerHTML = '<div class="loading">Loading EMI data...</div>';
 
   try {
-    const emiData = await fetchEMI();
+    const [emiData, accounts, transactions] = await Promise.all([
+      fetchEMI(),
+      fetchAccounts(),
+      fetchMonthlyExpenses(getMonthSheetName())
+    ]);
+    currentEMIData = emiData;
+    const balances = getAccountBalances(accounts, transactions);
     const calculated = calculateEMI(emiData);
-    renderEMICards('emiCards', calculated);
+    renderEMICards('emiCards', calculated, balances);
+    loadAccountOptions(accounts);
   } catch (err) {
     if (container) container.innerHTML = '<div class="loading">Failed to load EMI data.</div>';
   }
+}
+
+function loadAccountOptions(accounts) {
+  const selects = [document.getElementById('emiAccount'), document.getElementById('editEmiAccount')];
+  selects.forEach(select => {
+    if (!select) return;
+    const currentVal = select.value;
+    while (select.options.length > 1) select.remove(1);
+    accounts.forEach(acc => {
+      const opt = document.createElement('option');
+      opt.value = acc.account;
+      opt.textContent = acc.account;
+      select.appendChild(opt);
+    });
+    if (currentVal) select.value = currentVal;
+  });
 }
 
 function initEMIForm() {
@@ -34,11 +61,13 @@ function initEMIForm() {
       loanAmount: document.getElementById('emiLoanAmount').value,
       emi: document.getElementById('emiAmount').value,
       startDate: document.getElementById('emiStartDate').value,
-      tenureMonths: document.getElementById('emiTenure').value
+      tenureMonths: document.getElementById('emiTenure').value,
+      deductionDay: document.getElementById('emiDeductionDay').value,
+      account: document.getElementById('emiAccount').value
     };
 
     if (!emiData.name || !emiData.loanAmount || !emiData.emi || !emiData.startDate || !emiData.tenureMonths) {
-      statusEl.textContent = 'Please fill all fields';
+      statusEl.textContent = 'Please fill all required fields';
       statusEl.className = 'submit-status error';
       return;
     }
@@ -87,10 +116,73 @@ function initDeleteHandlers() {
   });
 }
 
+function initEditHandlers() {
+  const modal = document.getElementById('editEmiModal');
+  const form = document.getElementById('editEmiForm');
+  const cancelBtn = document.getElementById('editEmiCancel');
+
+  document.getElementById('emiCards').addEventListener('click', (e) => {
+    const btn = e.target.closest('.edit-btn');
+    if (!btn) return;
+
+    const idx = parseInt(btn.dataset.index);
+    const loan = currentEMIData[idx];
+    if (!loan) return;
+
+    document.getElementById('editEmiIndex').value = idx;
+    document.getElementById('editEmiName').value = loan.name;
+    document.getElementById('editEmiLoanAmount').value = loan.loanAmount;
+    document.getElementById('editEmiAmount').value = loan.emi;
+    document.getElementById('editEmiStartDate').value = loan.startDate;
+    document.getElementById('editEmiTenure').value = loan.tenureMonths;
+    document.getElementById('editEmiDeductionDay').value = loan.deductionDay || '';
+    document.getElementById('editEmiAccount').value = loan.account || '';
+    modal.classList.remove('hidden');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('editEmiSave');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    const data = {
+      rowIndex: parseInt(document.getElementById('editEmiIndex').value),
+      name: document.getElementById('editEmiName').value.trim(),
+      loanAmount: document.getElementById('editEmiLoanAmount').value,
+      emi: document.getElementById('editEmiAmount').value,
+      startDate: document.getElementById('editEmiStartDate').value,
+      tenureMonths: document.getElementById('editEmiTenure').value,
+      deductionDay: document.getElementById('editEmiDeductionDay').value,
+      account: document.getElementById('editEmiAccount').value
+    };
+
+    try {
+      await updateEMI(data);
+      modal.classList.add('hidden');
+      await loadEMIPage();
+    } catch (err) {
+      alert('Failed to update: ' + err.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initAuth(() => {
     initEMIForm();
     initDeleteHandlers();
+    initEditHandlers();
     loadEMIPage();
   });
 });

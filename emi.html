@@ -54,6 +54,12 @@
             <input type="date" id="emiStartDate" required>
             <input type="number" id="emiTenure" placeholder="Tenure (months)" inputmode="numeric" required>
           </div>
+          <div class="form-row">
+            <input type="number" id="emiDeductionDay" placeholder="Deduction day (1-31)" inputmode="numeric" min="1" max="31">
+            <select id="emiAccount">
+              <option value="">Debit Account</option>
+            </select>
+          </div>
           <button type="submit" class="submit-btn" id="emiSubmitBtn">Add EMI</button>
           <div class="submit-status" id="emiStatus"></div>
         </form>
@@ -64,6 +70,37 @@
       </div>
     </section>
     <div class="nav-spacer"></div>
+
+    <!-- Edit EMI Modal -->
+    <div class="modal-overlay hidden" id="editEmiModal">
+      <div class="modal-card">
+        <h3>Edit EMI</h3>
+        <form id="editEmiForm">
+          <input type="hidden" id="editEmiIndex">
+          <div class="form-row single">
+            <input type="text" id="editEmiName" placeholder="Loan Name" required>
+          </div>
+          <div class="form-row">
+            <input type="number" id="editEmiLoanAmount" placeholder="Loan Amount" inputmode="decimal" required>
+            <input type="number" id="editEmiAmount" placeholder="Monthly EMI" inputmode="decimal" required>
+          </div>
+          <div class="form-row">
+            <input type="date" id="editEmiStartDate" required>
+            <input type="number" id="editEmiTenure" placeholder="Tenure (months)" inputmode="numeric" required>
+          </div>
+          <div class="form-row">
+            <input type="number" id="editEmiDeductionDay" placeholder="Deduction day (1-31)" inputmode="numeric" min="1" max="31">
+            <select id="editEmiAccount">
+              <option value="">Debit Account</option>
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="editEmiCancel">Cancel</button>
+            <button type="submit" class="submit-btn" id="editEmiSave">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Bottom Navigation -->
