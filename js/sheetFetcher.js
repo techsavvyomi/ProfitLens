@@ -6,7 +6,7 @@ async function apiGet(action, params = {}) {
   url.searchParams.set('action', action);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), { redirect: 'follow' });
   const data = await response.json();
 
   if (data.error === 'unauthorized') {
@@ -24,8 +24,9 @@ async function apiPost(body) {
 
   const response = await fetch(CONFIG.WEBAPP_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
+    redirect: 'follow'
   });
   const data = await response.json();
 
@@ -141,7 +142,7 @@ async function verifyLogin(pin) {
   url.searchParams.set('pin', pin);
   url.searchParams.set('action', 'ping');
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), { redirect: 'follow' });
   const data = await response.json();
 
   if (data.error === 'unauthorized') return false;
