@@ -1,16 +1,20 @@
 #!/bin/bash
 # Build script: generates js/config.js from .env and js/config.example.js
+# Supports both .env file (local dev) and environment variables (Render, CI)
 # Run: bash build.sh
 
-if [ ! -f .env ]; then
-  echo "Error: .env file not found. Create one from .env.example"
-  exit 1
+# Load .env if it exists (local dev)
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
 fi
 
-# Load .env
-export $(grep -v '^#' .env | xargs)
+# Check that WEBAPP_URL is set (from .env or environment)
+if [ -z "$WEBAPP_URL" ]; then
+  echo "Error: WEBAPP_URL is not set. Either create a .env file or set it as an environment variable."
+  exit 1
+fi
 
 # Generate config.js from template
 sed "s|__WEBAPP_URL__|${WEBAPP_URL}|g" js/config.example.js > js/config.js
 
-echo "Generated js/config.js from .env"
+echo "Generated js/config.js successfully"
