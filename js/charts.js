@@ -21,15 +21,14 @@ function renderPieChart(canvasId, categoryTotals) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  if (pieChartInstance) pieChartInstance.destroy();
-
   const labels = Object.keys(categoryTotals);
   const data = Object.values(categoryTotals);
 
   if (labels.length === 0) return;
 
-  // If chart already exists with same data, skip re-render to avoid animation
+  // Skip re-render if data hasn't changed
   if (pieChartInstance && pieChartInstance._lastData === JSON.stringify(data)) return;
+  if (pieChartInstance) pieChartInstance.destroy();
 
   pieChartInstance = new Chart(canvas, {
     type: 'doughnut',

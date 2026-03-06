@@ -1,6 +1,6 @@
-// Firebase as primary database for fast reads
-// Reads always from Firebase, seeds from Sheets if empty
-// Writes go to Sheets (handles row logic) then Firebase is refreshed
+// Firebase as primary database
+// Reads/writes go to Firebase first (fast)
+// Sheets is synced in background (backup)
 
 let db = null;
 let firebaseReady = false;
@@ -26,16 +26,17 @@ function isReady() {
   return firebaseReady && db !== null;
 }
 
-// -- Firebase read/write --
+function docRef(pin, key) {
+  return db.collection('users').doc(pin).collection('data').doc(key);
+}
+
+// -- Core read/write --
 
 async function getData(pin, key) {
   if (!isReady()) return null;
   try {
-    const doc = await db.collection('users').doc(pin).collection('data').doc(key).get();
-    if (doc.exists) {
-      return doc.data().value;
-    }
-    return null;
+    const doc = await docRef(pin, key).get();
+    return doc.exists ? doc.data().value : null;
   } catch (err) {
     console.warn('Firebase read failed:', err.message);
     return null;
@@ -45,10 +46,7 @@ async function getData(pin, key) {
 async function setData(pin, key, value) {
   if (!isReady()) return;
   try {
-    await db.collection('users').doc(pin).collection('data').doc(key).set({
-      value: value,
-      updatedAt: Date.now()
-    });
+    await docRef(pin, key).set({ value, updatedAt: Date.now() });
   } catch (err) {
     console.warn('Firebase write failed:', err.message);
   }
@@ -56,39 +54,47 @@ async function setData(pin, key, value) {
 
 // -- Public API --
 
-// Read from Firebase first. If empty, seed from Sheets and store in Firebase.
+// Read from Firebase. If empty, seed from Sheets.
 async function primaryFetch(pin, key, sheetFetchFn) {
   const stored = await getData(pin, key);
-  if (stored !== null) {
-    return stored;
-  }
+  if (stored !== null) return stored;
 
-  // Firebase empty for this key — seed from Sheets
+  // First time — seed from Sheets
   const data = await sheetFetchFn();
-  setData(pin, key, data); // don't await, save in background
+  setData(pin, key, data);
   return data;
 }
 
-// Write to Sheets (handles row logic), then refresh Firebase with fresh data
-async function writeAndSync(pin, keysToRefresh, sheetWriteFn, sheetFetchFns) {
-  // Write to Sheets first (it manages rows/indexes)
+// Optimistic write: update Firebase immediately, sync Sheets in background
+async function optimisticWrite(pin, key, currentData, newItem, sheetWriteFn) {
+  // 1. Update Firebase immediately with new item appended
+  const updated = [...currentData, newItem];
+  await setData(pin, key, updated);
+
+  // 2. Write to Sheets in background (backup) — don't block UI
+  sheetWriteFn().catch(err => console.warn('Sheet backup failed:', err.message));
+
+  return updated;
+}
+
+// For operations that modify existing data (edit/delete), we can't easily do optimistic.
+// Write to Sheets first, then refresh Firebase from Sheets.
+async function writeAndRefresh(pin, keysAndFetchers, sheetWriteFn) {
   const result = await sheetWriteFn();
 
-  // Refresh Firebase with fresh data from Sheets (in background)
-  for (let i = 0; i < keysToRefresh.length; i++) {
-    const key = keysToRefresh[i];
-    const fetchFn = sheetFetchFns[i];
+  // Refresh Firebase in background
+  for (const { key, fetchFn } of keysAndFetchers) {
     fetchFn().then(fresh => setData(pin, key, fresh)).catch(() => {});
   }
 
   return result;
 }
 
-// Force refresh a key from Sheets into Firebase
+// Force sync from Sheets to Firebase
 async function syncFromSheets(pin, key, sheetFetchFn) {
   const data = await sheetFetchFn();
   await setData(pin, key, data);
   return data;
 }
 
-export { initFirebase, isReady, primaryFetch, writeAndSync, syncFromSheets, setData };
+export { initFirebase, isReady, primaryFetch, optimisticWrite, writeAndRefresh, syncFromSheets, getData, setData };
