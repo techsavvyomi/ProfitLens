@@ -13,7 +13,7 @@ const CONFIG = {
     apiKey: '__FIREBASE_API_KEY__',
     authDomain: '__PROJECT_ID__.firebaseapp.com',
     projectId: '__PROJECT_ID__',
-    storageBucket: '__PROJECT_ID__.appspot.com',
+    storageBucket: '__FIREBASE_STORAGE_BUCKET__',
     messagingSenderId: '__SENDER_ID__',
     appId: '__APP_ID__'
   }

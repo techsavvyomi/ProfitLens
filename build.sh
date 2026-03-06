@@ -15,6 +15,13 @@ if [ -z "$WEBAPP_URL" ]; then
 fi
 
 # Generate config.js from template
-sed "s|__WEBAPP_URL__|${WEBAPP_URL}|g" js/config.example.js > js/config.js
+sed \
+  -e "s|__WEBAPP_URL__|${WEBAPP_URL}|g" \
+  -e "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g" \
+  -e "s|__PROJECT_ID__|${FIREBASE_PROJECT_ID}|g" \
+  -e "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g" \
+  -e "s|__SENDER_ID__|${FIREBASE_SENDER_ID}|g" \
+  -e "s|__APP_ID__|${FIREBASE_APP_ID}|g" \
+  js/config.example.js > js/config.js
 
 echo "Generated js/config.js successfully"
