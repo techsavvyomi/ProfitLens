@@ -2,6 +2,7 @@ import { fetchEMI, fetchAccounts, fetchMonthlyExpenses, submitEMI, updateEMI, de
 import { calculateEMI, renderEMICards } from './emi.js';
 import { getAccountBalances } from './dashboard.js';
 import { getMonthSheetName } from './config.js';
+import { processEMIs, renderNotificationBanner } from './emiAutoProcess.js';
 import { initAuth } from './auth.js';
 
 let currentEMIData = [];
@@ -21,6 +22,11 @@ async function loadEMIPage() {
     const calculated = calculateEMI(emiData);
     renderEMICards('emiCards', calculated, balances);
     loadAccountOptions(accounts);
+
+    // Show EMI notifications
+    processEMIs(getMonthSheetName(), { autoAdd: false }).then(({ notifications }) => {
+      renderNotificationBanner('notificationBanner', notifications);
+    }).catch(() => {});
   } catch (err) {
     if (container) container.innerHTML = '<div class="loading">Failed to load EMI data.</div>';
   }

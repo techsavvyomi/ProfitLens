@@ -3,11 +3,13 @@ import { fetchMonthlyExpenses, fetchAccounts, submitExpense, updateExpense, dele
 import { getTotalExpenses, getCategoryTotals, getMonthlySummary, getAccountBalances } from './dashboard.js';
 import { renderPieChart, renderLineChart, renderBarChart } from './charts.js';
 import { generateInsights, renderInsights } from './insights.js';
+import { processEMIs, requestNotificationPermission, renderNotificationBanner } from './emiAutoProcess.js';
 import { initAuth } from './auth.js';
 
 let selectedCategory = '';
 let selectedType = 'Expense';
 let currentSheetName = '';
+let emiProcessedThisSession = false;
 
 function escapeHtml(str) {
   const div = document.createElement('div');
@@ -355,7 +357,9 @@ function renderTransactions(transactions, sheetName) {
       if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]);
       return new Date(d);
     };
-    return parseDate(b.date) - parseDate(a.date);
+    const dateDiff = parseDate(b.date) - parseDate(a.date);
+    if (dateDiff !== 0) return dateDiff;
+    return b.rowIndex - a.rowIndex;
   });
 
   const recent = sorted.slice(0, 20);
@@ -545,6 +549,25 @@ async function loadDashboard(monthName) {
   renderInsights('insightsList', insights);
 
   renderTransactions(transactions, currentSheetName);
+
+  // Auto-process EMIs and show notifications (only for current month, once per session)
+  if (currentSheetName === getMonthSheetName()) {
+    if (!emiProcessedThisSession) {
+      emiProcessedThisSession = true;
+      processEMIs(currentSheetName).then(({ added, notifications }) => {
+        renderNotificationBanner('notificationBanner', notifications);
+        if (added.length > 0) {
+          setTimeout(() => loadDashboard(currentSheetName), 1000);
+        }
+      }).catch(() => {});
+    } else {
+      processEMIs(currentSheetName, { autoAdd: false }).then(({ notifications }) => {
+        renderNotificationBanner('notificationBanner', notifications);
+      }).catch(() => {});
+    }
+  } else {
+    renderNotificationBanner('notificationBanner', []);
+  }
 }
 
 // -- Refresh Button --
@@ -614,6 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTransferAccountOptions();
     initRefreshButton();
     initCSVDownload();
+    requestNotificationPermission();
     loadDashboard();
 
     // Auto-refresh every 5 minutes (Firebase is primary, no need for aggressive polling)
