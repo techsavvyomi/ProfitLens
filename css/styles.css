@@ -349,6 +349,7 @@ body {
   color: var(--text);
   outline: none;
   width: 100%;
+  min-width: 0;
 }
 
 .amount-input-wrap input::placeholder {
@@ -489,6 +490,8 @@ body {
   -webkit-appearance: none;
   appearance: none;
   outline: none;
+  min-width: 0;
+  width: 100%;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -827,6 +830,9 @@ tbody tr:hover {
   background: var(--surface);
   outline: none;
   width: 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -939,6 +945,8 @@ tbody tr:hover {
   -webkit-appearance: none;
   appearance: none;
   outline: none;
+  min-width: 0;
+  width: 100%;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -966,8 +974,9 @@ tbody tr:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 16px;
   box-shadow: var(--shadow);
+  overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -985,11 +994,17 @@ tbody tr:hover {
 .card-header-row h3 {
   font-size: 17px;
   font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 10px;
 }
 
 .card-actions {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .edit-btn {
@@ -1115,8 +1130,8 @@ tbody tr:hover {
 }
 
 .emi-detail:last-of-type { border-bottom: none; }
-.emi-detail .label { color: var(--text-secondary); }
-.emi-detail .value { font-weight: 600; }
+.emi-detail .label { color: var(--text-secondary); white-space: nowrap; margin-right: 12px; }
+.emi-detail .value { font-weight: 600; text-align: right; word-break: break-word; }
 
 .progress-bar {
   margin-top: 14px;
@@ -1145,6 +1160,81 @@ tbody tr:hover {
 .sip-card h3 {
   color: var(--purple);
 }
+
+/* Refresh Button */
+.refresh-btn {
+  background: var(--accent-light);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--accent);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.refresh-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.refresh-btn:active {
+  transform: scale(0.9);
+}
+
+.refresh-btn.spinning svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Page Header with actions */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.page-header-text {
+  flex: 1;
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+/* CSV Download Button */
+.csv-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--green-light);
+  color: var(--green);
+  border: 1.5px solid var(--green);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.csv-btn:hover {
+  background: var(--green);
+  color: #fff;
+}
+
+.csv-btn:active { transform: scale(0.98); }
 
 /* Loading State */
 .loading {
@@ -1211,11 +1301,11 @@ tbody tr:hover {
 }
 
 /* =============== */
-/* DESKTOP STYLES  */
+/* TABLET STYLES   */
 /* =============== */
 @media (min-width: 768px) {
   body {
-    max-width: 600px;
+    max-width: 500px;
     margin: 0 auto;
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
@@ -1223,7 +1313,7 @@ tbody tr:hover {
   }
 
   .bottom-nav {
-    max-width: 600px;
+    max-width: 500px;
     left: 50%;
     transform: translateX(-50%);
   }
@@ -1235,8 +1325,15 @@ tbody tr:hover {
   .stat-widget .widget-value {
     font-size: 18px;
   }
+
+  .emi-card {
+    padding: 20px;
+  }
 }
 
+/* =============== */
+/* DESKTOP STYLES  */
+/* =============== */
 @media (min-width: 1024px) {
   body {
     max-width: 480px;

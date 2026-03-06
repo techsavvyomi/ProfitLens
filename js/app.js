@@ -547,6 +547,56 @@ async function loadDashboard(monthName) {
   renderTransactions(transactions, currentSheetName);
 }
 
+// -- Refresh Button --
+
+function initRefreshButton() {
+  const btn = document.getElementById('refreshBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.classList.add('spinning');
+    const select = document.getElementById('monthSelect');
+    await loadDashboard(select ? select.value : undefined);
+    btn.classList.remove('spinning');
+  });
+}
+
+// -- CSV Download --
+
+function initCSVDownload() {
+  const btn = document.getElementById('csvDownloadBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const select = document.getElementById('monthSelect');
+    const month = select ? select.value : getMonthSheetName();
+    btn.disabled = true;
+    try {
+      const transactions = await fetchMonthlyExpenses(month);
+      if (transactions.length === 0) {
+        alert('No data to download for ' + month);
+        return;
+      }
+      const headers = ['Date', 'Category', 'SubCategory', 'Account', 'Amount', 'Type', 'Notes'];
+      const rows = transactions.map(t =>
+        [t.date, t.category, t.subCategory, t.account, t.amount, t.type, t.notes]
+          .map(v => '"' + String(v).replace(/"/g, '""') + '"')
+          .join(',')
+      );
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ProfitLens_${month}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to download: ' + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 // -- Init --
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -560,6 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initTransactionActions();
     initTransferForm();
     loadTransferAccountOptions();
+    initRefreshButton();
+    initCSVDownload();
     loadDashboard();
 
     setInterval(() => {

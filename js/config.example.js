@@ -8,7 +8,15 @@ const CONFIG = {
   CATEGORIES: [
     'Food', 'Bike', 'Home', 'EMI', 'Savings',
     'Investment', 'CreditCard', 'Utilities', 'Shopping', 'Other'
-  ]
+  ],
+  FIREBASE: {
+    apiKey: '__FIREBASE_API_KEY__',
+    authDomain: '__PROJECT_ID__.firebaseapp.com',
+    projectId: '__PROJECT_ID__',
+    storageBucket: '__PROJECT_ID__.appspot.com',
+    messagingSenderId: '__SENDER_ID__',
+    appId: '__APP_ID__'
+  }
 };
 
 function getPin() {

@@ -1,4 +1,10 @@
 import { CONFIG, getPin, clearPin } from './config.js';
+import { initFirebase, isReady as isFirebaseReady, cachedFetch, writeAndInvalidate } from './firebaseStore.js';
+
+// Initialize Firebase if config is present
+if (CONFIG.FIREBASE && CONFIG.FIREBASE.apiKey && !CONFIG.FIREBASE.apiKey.startsWith('__')) {
+  initFirebase(CONFIG.FIREBASE);
+}
 
 async function apiGet(action, params = {}) {
   const url = new URL(CONFIG.WEBAPP_URL);
@@ -22,7 +28,6 @@ async function apiGet(action, params = {}) {
 async function apiPost(body) {
   body.pin = getPin();
 
-  // Use GET with payload param to avoid CORS/redirect issues on mobile
   const url = new URL(CONFIG.WEBAPP_URL);
   url.searchParams.set('pin', getPin());
   url.searchParams.set('action', 'write');
@@ -41,8 +46,9 @@ async function apiPost(body) {
   return data;
 }
 
-async function fetchMonthlyExpenses(sheetName) {
-  const data = await apiGet('fetch', { sheet: sheetName });
+// -- Raw Sheet fetchers (used directly and as Firebase fallbacks) --
+
+function parseExpenses(data) {
   if (!Array.isArray(data)) return [];
   return data.map((row, index) => ({
     rowIndex: index,
@@ -56,8 +62,7 @@ async function fetchMonthlyExpenses(sheetName) {
   }));
 }
 
-async function fetchAccounts() {
-  const data = await apiGet('accounts');
+function parseAccounts(data) {
   if (!Array.isArray(data)) return [];
   return data.map(row => ({
     account: row.Account || '',
@@ -66,8 +71,7 @@ async function fetchAccounts() {
   }));
 }
 
-async function fetchEMI() {
-  const data = await apiGet('emi');
+function parseEMI(data) {
   if (!Array.isArray(data)) return [];
   return data.map(row => ({
     name: row.Name || '',
@@ -80,8 +84,7 @@ async function fetchEMI() {
   }));
 }
 
-async function fetchSIP() {
-  const data = await apiGet('sip');
+function parseSIP(data) {
   if (!Array.isArray(data)) return [];
   return data.map(row => ({
     fund: row.Fund || '',
@@ -90,68 +93,137 @@ async function fetchSIP() {
   }));
 }
 
+async function sheetFetchExpenses(sheetName) {
+  const data = await apiGet('fetch', { sheet: sheetName });
+  return parseExpenses(data);
+}
+
+async function sheetFetchAccounts() {
+  const data = await apiGet('accounts');
+  return parseAccounts(data);
+}
+
+async function sheetFetchEMI() {
+  const data = await apiGet('emi');
+  return parseEMI(data);
+}
+
+async function sheetFetchSIP() {
+  const data = await apiGet('sip');
+  return parseSIP(data);
+}
+
+// -- Public fetch functions (Firebase-cached when available) --
+
+async function fetchMonthlyExpenses(sheetName) {
+  if (isFirebaseReady()) {
+    return cachedFetch(getPin(), `expenses_${sheetName}`, () => sheetFetchExpenses(sheetName));
+  }
+  return sheetFetchExpenses(sheetName);
+}
+
+async function fetchAccounts() {
+  if (isFirebaseReady()) {
+    return cachedFetch(getPin(), 'accounts', () => sheetFetchAccounts());
+  }
+  return sheetFetchAccounts();
+}
+
+async function fetchEMI() {
+  if (isFirebaseReady()) {
+    return cachedFetch(getPin(), 'emi', () => sheetFetchEMI());
+  }
+  return sheetFetchEMI();
+}
+
+async function fetchSIP() {
+  if (isFirebaseReady()) {
+    return cachedFetch(getPin(), 'sip', () => sheetFetchSIP());
+  }
+  return sheetFetchSIP();
+}
+
+// -- Write functions (write to Sheets + invalidate Firebase cache) --
+
 async function submitExpense(expenseData) {
-  return apiPost({
-    action: 'addExpense',
-    ...expenseData
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['accounts'], () =>
+      apiPost({ action: 'addExpense', ...expenseData })
+    );
+  }
+  return apiPost({ action: 'addExpense', ...expenseData });
 }
 
 async function submitEMI(emiData) {
-  return apiPost({
-    action: 'addEMI',
-    ...emiData
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['emi'], () =>
+      apiPost({ action: 'addEMI', ...emiData })
+    );
+  }
+  return apiPost({ action: 'addEMI', ...emiData });
 }
 
 async function updateEMI(emiData) {
-  return apiPost({
-    action: 'updateEMI',
-    ...emiData
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['emi'], () =>
+      apiPost({ action: 'updateEMI', ...emiData })
+    );
+  }
+  return apiPost({ action: 'updateEMI', ...emiData });
 }
 
 async function deleteEMI(rowIndex) {
-  return apiPost({
-    action: 'deleteEMI',
-    rowIndex
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['emi'], () =>
+      apiPost({ action: 'deleteEMI', rowIndex })
+    );
+  }
+  return apiPost({ action: 'deleteEMI', rowIndex });
 }
 
 async function submitTransfer(transferData) {
-  return apiPost({
-    action: 'addTransfer',
-    ...transferData
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['accounts'], () =>
+      apiPost({ action: 'addTransfer', ...transferData })
+    );
+  }
+  return apiPost({ action: 'addTransfer', ...transferData });
 }
 
 async function submitSIP(sipData) {
-  return apiPost({
-    action: 'addSIP',
-    ...sipData
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['sip'], () =>
+      apiPost({ action: 'addSIP', ...sipData })
+    );
+  }
+  return apiPost({ action: 'addSIP', ...sipData });
 }
 
 async function deleteSIP(rowIndex) {
-  return apiPost({
-    action: 'deleteSIP',
-    rowIndex
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['sip'], () =>
+      apiPost({ action: 'deleteSIP', rowIndex })
+    );
+  }
+  return apiPost({ action: 'deleteSIP', rowIndex });
 }
 
 async function updateExpense(data) {
-  return apiPost({
-    action: 'updateExpense',
-    ...data
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), ['accounts'], () =>
+      apiPost({ action: 'updateExpense', ...data })
+    );
+  }
+  return apiPost({ action: 'updateExpense', ...data });
 }
 
 async function deleteExpenseEntry(sheet, rowIndex) {
-  return apiPost({
-    action: 'deleteExpense',
-    sheet,
-    rowIndex
-  });
+  if (isFirebaseReady()) {
+    return writeAndInvalidate(getPin(), [`expenses_${sheet}`, 'accounts'], () =>
+      apiPost({ action: 'deleteExpense', sheet, rowIndex })
+    );
+  }
+  return apiPost({ action: 'deleteExpense', sheet, rowIndex });
 }
 
 async function verifyLogin(pin) {

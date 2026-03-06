@@ -6,7 +6,8 @@ A personal finance tracker PWA powered by Google Sheets as the backend. Track ex
 
 - **Frontend:** Vanilla JavaScript (ES Modules), HTML5, CSS3
 - **Backend:** Google Apps Script (Web App)
-- **Database:** Google Sheets
+- **Database:** Google Sheets (source of truth)
+- **Cache:** Firebase Firestore (optional, fast reads with 5-min TTL)
 - **Charts:** Chart.js
 - **Auth:** PIN-based authentication via Google Apps Script
 - **PWA:** Service Worker + Web App Manifest for installable mobile experience
@@ -51,8 +52,11 @@ A personal finance tracker PWA powered by Google Sheets as the backend. Track ex
 - Dark mode with persistent preference
 - PIN-locked access
 - Installable as PWA on mobile (home screen icon, offline shell)
+- Manual refresh button on every page
+- CSV download for monthly transaction data
+- Firebase Firestore caching for instant reads (optional)
 - Auto-refresh dashboard at configurable interval
-- Mobile-first responsive design (max 600px on desktop)
+- Mobile-first responsive design optimized for Samsung S24 Ultra (412dp), responsive on tablets
 - CORS-safe: all writes routed through GET to avoid redirect issues on mobile
 
 ## Project Structure
@@ -74,7 +78,8 @@ A personal finance tracker PWA powered by Google Sheets as the backend. Track ex
 │   ├── emiPage.js          # EMI page form/edit/delete handlers
 │   ├── investments.js      # SIP calculation + rendering
 │   ├── investmentsPage.js  # SIP page handlers
-│   ├── sheetFetcher.js     # All API calls to Google Apps Script
+│   ├── sheetFetcher.js     # All API calls (Firebase-cached when available)
+│   ├── firebaseStore.js    # Firebase Firestore caching layer
 │   └── auth.js             # PIN login flow
 ├── sw.js                   # Service worker
 ├── manifest.json           # PWA manifest
@@ -95,7 +100,95 @@ A personal finance tracker PWA powered by Google Sheets as the backend. Track ex
 
 3. Copy `js/config.example.js` to `js/config.js` and set your `WEBAPP_URL`.
 
-4. Serve the files (any static host — GitHub Pages, Netlify, Vercel, etc.).
+4. (Optional) Set up Firebase for fast cached reads — see [Firebase Setup](#firebase-setup) below.
+
+5. Serve the files (any static host — GitHub Pages, Netlify, Vercel, etc.).
+
+## Firebase Setup
+
+Firebase Firestore is used as an **optional caching layer** for faster reads. Google Sheets remains the source of truth — all writes go to Sheets first, then the relevant Firebase cache is invalidated. If Firebase is not configured, the app works exactly the same, just reads come directly from Sheets.
+
+### 1. Create a Firebase Project
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Click **Add project** → enter a project name → continue
+3. Disable Google Analytics (optional) → **Create project**
+
+### 2. Create a Firestore Database
+
+1. In your Firebase project, go to **Build → Firestore Database**
+2. Click **Create database**
+3. Choose **Start in test mode** (you'll add security rules next)
+4. Select a Cloud Firestore location closest to you → **Enable**
+
+### 3. Set Firestore Security Rules
+
+Go to **Firestore Database → Rules** and replace the default rules with:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each user (identified by PIN) can only read/write their own cache
+    match /users/{pin}/cache/{document=**} {
+      allow read, write: if true;
+    }
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+> **Note:** Since the PIN acts as both auth and the document path, only someone with the correct PIN can access that user's cached data. For stronger security, you can add Firebase Authentication and restrict rules to authenticated users.
+
+### 4. Get Firebase Config
+
+1. In Firebase Console, go to **Project Settings** (gear icon) → **General**
+2. Scroll down to **Your apps** → click the **Web** icon (`</>`) to add a web app
+3. Register a name (e.g., "ProfitLens") → **Register app**
+4. Copy the `firebaseConfig` object — you'll need these values:
+   ```js
+   const firebaseConfig = {
+     apiKey: "AIza...",
+     authDomain: "your-project.firebaseapp.com",
+     projectId: "your-project",
+     storageBucket: "your-project.appspot.com",
+     messagingSenderId: "123456789",
+     appId: "1:123456789:web:abc123"
+   };
+   ```
+
+### 5. Add Config to Your App
+
+In your `js/config.js`, fill in the `FIREBASE` section with the values from step 4:
+
+```js
+FIREBASE: {
+  apiKey: 'AIza...',
+  authDomain: 'your-project.firebaseapp.com',
+  projectId: 'your-project',
+  storageBucket: 'your-project.appspot.com',
+  messagingSenderId: '123456789',
+  appId: '1:123456789:web:abc123'
+}
+```
+
+### How It Works
+
+```
+Read flow:  App → Firebase cache (hit?) → return cached data
+                                (miss?) → Google Sheets → save to cache → return
+
+Write flow: App → Google Sheets (write) → invalidate Firebase cache
+            Next read fetches fresh data from Sheets and re-caches it
+```
+
+- Cache TTL is **5 minutes** — stale cache entries are ignored and re-fetched
+- Background refresh: even on a cache hit, fresh data is fetched from Sheets in the background to keep the cache warm
+- Cache keys: `expenses_{MonthSheet}`, `accounts`, `emi`, `sip`
+- Firestore path: `users/{pin}/cache/{key}` → `{ value: [...], timestamp: ... }`
 
 ## Google Apps Script Actions
 

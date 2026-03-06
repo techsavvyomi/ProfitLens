@@ -85,10 +85,21 @@ function initDeleteHandlers() {
   });
 }
 
+function initRefreshButton() {
+  const btn = document.getElementById('refreshBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.classList.add('spinning');
+    await loadInvestmentsPage();
+    btn.classList.remove('spinning');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initAuth(() => {
     initSIPForm();
     initDeleteHandlers();
+    initRefreshButton();
     loadInvestmentsPage();
   });
 });

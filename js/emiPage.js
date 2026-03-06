@@ -178,11 +178,22 @@ function initEditHandlers() {
   });
 }
 
+function initRefreshButton() {
+  const btn = document.getElementById('refreshBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.classList.add('spinning');
+    await loadEMIPage();
+    btn.classList.remove('spinning');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initAuth(() => {
     initEMIForm();
     initDeleteHandlers();
     initEditHandlers();
+    initRefreshButton();
     loadEMIPage();
   });
 });
