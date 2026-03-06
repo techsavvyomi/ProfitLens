@@ -1,4 +1,4 @@
-import { fetchEMI, fetchAccounts, fetchMonthlyExpenses, submitEMI, updateEMI, deleteEMI } from './sheetFetcher.js';
+import { fetchEMI, fetchAccounts, fetchMonthlyExpenses, submitEMI, updateEMI, deleteEMI, forceSyncAll } from './sheetFetcher.js';
 import { calculateEMI, renderEMICards } from './emi.js';
 import { getAccountBalances } from './dashboard.js';
 import { getMonthSheetName } from './config.js';
@@ -183,6 +183,7 @@ function initRefreshButton() {
   if (!btn) return;
   btn.addEventListener('click', async () => {
     btn.classList.add('spinning');
+    await forceSyncAll(getMonthSheetName());
     await loadEMIPage();
     btn.classList.remove('spinning');
   });

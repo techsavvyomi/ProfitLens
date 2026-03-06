@@ -1,6 +1,6 @@
-// Firebase caching layer for fast reads/writes
-// Reads from Firebase first, falls back to Sheets
-// Writes go to Sheets (source of truth) AND sync to Firebase
+// Firebase as primary database for fast reads
+// Reads always from Firebase, seeds from Sheets if empty
+// Writes go to Sheets (handles row logic) then Firebase is refreshed
 
 let db = null;
 let firebaseReady = false;
@@ -26,22 +26,14 @@ function isReady() {
   return firebaseReady && db !== null;
 }
 
-function getDocPath(pin, collection) {
-  return `users/${pin}/${collection}`;
-}
+// -- Firebase read/write --
 
-// -- Cache reads --
-
-async function getCached(pin, key) {
+async function getData(pin, key) {
   if (!isReady()) return null;
   try {
-    const doc = await db.collection('users').doc(pin).collection('cache').doc(key).get();
+    const doc = await db.collection('users').doc(pin).collection('data').doc(key).get();
     if (doc.exists) {
-      const data = doc.data();
-      // Cache valid for 5 minutes
-      if (data.timestamp && (Date.now() - data.timestamp) < 5 * 60 * 1000) {
-        return data.value;
-      }
+      return doc.data().value;
     }
     return null;
   } catch (err) {
@@ -50,57 +42,53 @@ async function getCached(pin, key) {
   }
 }
 
-async function setCache(pin, key, value) {
+async function setData(pin, key, value) {
   if (!isReady()) return;
   try {
-    await db.collection('users').doc(pin).collection('cache').doc(key).set({
+    await db.collection('users').doc(pin).collection('data').doc(key).set({
       value: value,
-      timestamp: Date.now()
+      updatedAt: Date.now()
     });
   } catch (err) {
     console.warn('Firebase write failed:', err.message);
   }
 }
 
-async function invalidateCache(pin, key) {
-  if (!isReady()) return;
-  try {
-    await db.collection('users').doc(pin).collection('cache').doc(key).delete();
-  } catch (err) {
-    // Ignore delete failures
-  }
-}
-
 // -- Public API --
 
-async function cachedFetch(pin, cacheKey, sheetFetchFn) {
-  // Try Firebase cache first
-  const cached = await getCached(pin, cacheKey);
-  if (cached !== null) {
-    // Refresh cache in background from Sheets
-    sheetFetchFn().then(fresh => setCache(pin, cacheKey, fresh)).catch(() => {});
-    return cached;
+// Read from Firebase first. If empty, seed from Sheets and store in Firebase.
+async function primaryFetch(pin, key, sheetFetchFn) {
+  const stored = await getData(pin, key);
+  if (stored !== null) {
+    return stored;
   }
 
-  // Fallback to Sheets
+  // Firebase empty for this key — seed from Sheets
   const data = await sheetFetchFn();
-
-  // Save to Firebase cache
-  setCache(pin, cacheKey, data);
-
+  setData(pin, key, data); // don't await, save in background
   return data;
 }
 
-async function writeAndInvalidate(pin, cacheKeys, sheetWriteFn) {
-  // Write to Sheets first (source of truth)
+// Write to Sheets (handles row logic), then refresh Firebase with fresh data
+async function writeAndSync(pin, keysToRefresh, sheetWriteFn, sheetFetchFns) {
+  // Write to Sheets first (it manages rows/indexes)
   const result = await sheetWriteFn();
 
-  // Invalidate relevant caches so next read fetches fresh data
-  for (const key of cacheKeys) {
-    invalidateCache(pin, key);
+  // Refresh Firebase with fresh data from Sheets (in background)
+  for (let i = 0; i < keysToRefresh.length; i++) {
+    const key = keysToRefresh[i];
+    const fetchFn = sheetFetchFns[i];
+    fetchFn().then(fresh => setData(pin, key, fresh)).catch(() => {});
   }
 
   return result;
 }
 
-export { initFirebase, isReady, cachedFetch, writeAndInvalidate, setCache, invalidateCache };
+// Force refresh a key from Sheets into Firebase
+async function syncFromSheets(pin, key, sheetFetchFn) {
+  const data = await sheetFetchFn();
+  await setData(pin, key, data);
+  return data;
+}
+
+export { initFirebase, isReady, primaryFetch, writeAndSync, syncFromSheets, setData };

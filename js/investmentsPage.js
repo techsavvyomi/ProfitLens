@@ -1,4 +1,5 @@
-import { fetchSIP, submitSIP, deleteSIP } from './sheetFetcher.js';
+import { fetchSIP, submitSIP, deleteSIP, forceSyncAll } from './sheetFetcher.js';
+import { getMonthSheetName } from './config.js';
 import { calculateSIP, renderSIPCards } from './investments.js';
 import { initAuth } from './auth.js';
 
@@ -90,6 +91,7 @@ function initRefreshButton() {
   if (!btn) return;
   btn.addEventListener('click', async () => {
     btn.classList.add('spinning');
+    await forceSyncAll(getMonthSheetName());
     await loadInvestmentsPage();
     btn.classList.remove('spinning');
   });

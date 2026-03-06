@@ -130,7 +130,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Each user (identified by PIN) can only read/write their own cache
-    match /users/{pin}/cache/{document=**} {
+    match /users/{pin}/data/{document=**} {
       allow read, write: if true;
     }
     // Deny everything else
@@ -188,7 +188,7 @@ Write flow: App → Google Sheets (write) → invalidate Firebase cache
 - Cache TTL is **5 minutes** — stale cache entries are ignored and re-fetched
 - Background refresh: even on a cache hit, fresh data is fetched from Sheets in the background to keep the cache warm
 - Cache keys: `expenses_{MonthSheet}`, `accounts`, `emi`, `sip`
-- Firestore path: `users/{pin}/cache/{key}` → `{ value: [...], timestamp: ... }`
+- Firestore path: `users/{pin}/data/{key}` → `{ value: [...], updatedAt: ... }`
 
 ## Google Apps Script Actions
 

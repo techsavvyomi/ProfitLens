@@ -1,5 +1,5 @@
 import { CONFIG, getMonthSheetName, getPreviousMonthSheetName, getRecentMonths, formatCurrency, getTodayFormatted } from './config.js';
-import { fetchMonthlyExpenses, fetchAccounts, submitExpense, updateExpense, deleteExpenseEntry, submitTransfer } from './sheetFetcher.js';
+import { fetchMonthlyExpenses, fetchAccounts, submitExpense, updateExpense, deleteExpenseEntry, submitTransfer, forceSyncAll } from './sheetFetcher.js';
 import { getTotalExpenses, getCategoryTotals, getMonthlySummary, getAccountBalances } from './dashboard.js';
 import { renderPieChart, renderLineChart, renderBarChart } from './charts.js';
 import { generateInsights, renderInsights } from './insights.js';
@@ -555,7 +555,9 @@ function initRefreshButton() {
   btn.addEventListener('click', async () => {
     btn.classList.add('spinning');
     const select = document.getElementById('monthSelect');
-    await loadDashboard(select ? select.value : undefined);
+    const month = select ? select.value : getMonthSheetName();
+    await forceSyncAll(month);
+    await loadDashboard(month);
     btn.classList.remove('spinning');
   });
 }
@@ -614,9 +616,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initCSVDownload();
     loadDashboard();
 
+    // Auto-refresh every 5 minutes (Firebase is primary, no need for aggressive polling)
     setInterval(() => {
       const select = document.getElementById('monthSelect');
       loadDashboard(select ? select.value : undefined);
-    }, CONFIG.REFRESH_INTERVAL);
+    }, 5 * 60 * 1000);
   });
 });

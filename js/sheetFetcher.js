@@ -1,5 +1,5 @@
 import { CONFIG, getPin, clearPin } from './config.js';
-import { initFirebase, isReady as isFirebaseReady, cachedFetch, writeAndInvalidate } from './firebaseStore.js';
+import { initFirebase, isReady as isFirebaseReady, primaryFetch, writeAndSync, syncFromSheets } from './firebaseStore.js';
 
 // Initialize Firebase if config is present
 if (CONFIG.FIREBASE && CONFIG.FIREBASE.apiKey && !CONFIG.FIREBASE.apiKey.startsWith('__')) {
@@ -46,7 +46,7 @@ async function apiPost(body) {
   return data;
 }
 
-// -- Raw Sheet fetchers (used directly and as Firebase fallbacks) --
+// -- Sheet fetchers (used to seed Firebase and as fallback) --
 
 function parseExpenses(data) {
   if (!Array.isArray(data)) return [];
@@ -93,62 +93,62 @@ function parseSIP(data) {
   }));
 }
 
-async function sheetFetchExpenses(sheetName) {
-  const data = await apiGet('fetch', { sheet: sheetName });
-  return parseExpenses(data);
+function sheetFetchExpenses(sheetName) {
+  return apiGet('fetch', { sheet: sheetName }).then(parseExpenses);
 }
 
-async function sheetFetchAccounts() {
-  const data = await apiGet('accounts');
-  return parseAccounts(data);
+function sheetFetchAccounts() {
+  return apiGet('accounts').then(parseAccounts);
 }
 
-async function sheetFetchEMI() {
-  const data = await apiGet('emi');
-  return parseEMI(data);
+function sheetFetchEMI() {
+  return apiGet('emi').then(parseEMI);
 }
 
-async function sheetFetchSIP() {
-  const data = await apiGet('sip');
-  return parseSIP(data);
+function sheetFetchSIP() {
+  return apiGet('sip').then(parseSIP);
 }
 
-// -- Public fetch functions (Firebase-cached when available) --
+// -- Public fetch functions (Firebase-primary, Sheets fallback) --
 
 async function fetchMonthlyExpenses(sheetName) {
   if (isFirebaseReady()) {
-    return cachedFetch(getPin(), `expenses_${sheetName}`, () => sheetFetchExpenses(sheetName));
+    return primaryFetch(getPin(), `expenses_${sheetName}`, () => sheetFetchExpenses(sheetName));
   }
   return sheetFetchExpenses(sheetName);
 }
 
 async function fetchAccounts() {
   if (isFirebaseReady()) {
-    return cachedFetch(getPin(), 'accounts', () => sheetFetchAccounts());
+    return primaryFetch(getPin(), 'accounts', sheetFetchAccounts);
   }
   return sheetFetchAccounts();
 }
 
 async function fetchEMI() {
   if (isFirebaseReady()) {
-    return cachedFetch(getPin(), 'emi', () => sheetFetchEMI());
+    return primaryFetch(getPin(), 'emi', sheetFetchEMI);
   }
   return sheetFetchEMI();
 }
 
 async function fetchSIP() {
   if (isFirebaseReady()) {
-    return cachedFetch(getPin(), 'sip', () => sheetFetchSIP());
+    return primaryFetch(getPin(), 'sip', sheetFetchSIP);
   }
   return sheetFetchSIP();
 }
 
-// -- Write functions (write to Sheets + invalidate Firebase cache) --
+// -- Write functions (write to Sheets, then sync fresh data to Firebase) --
 
 async function submitExpense(expenseData) {
+  const sheetName = expenseData.sheet;
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['accounts'], () =>
-      apiPost({ action: 'addExpense', ...expenseData })
+    return writeAndSync(
+      getPin(),
+      [`expenses_${sheetName}`, 'accounts'],
+      () => apiPost({ action: 'addExpense', ...expenseData }),
+      [() => sheetFetchExpenses(sheetName), sheetFetchAccounts]
     );
   }
   return apiPost({ action: 'addExpense', ...expenseData });
@@ -156,8 +156,10 @@ async function submitExpense(expenseData) {
 
 async function submitEMI(emiData) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['emi'], () =>
-      apiPost({ action: 'addEMI', ...emiData })
+    return writeAndSync(
+      getPin(), ['emi'],
+      () => apiPost({ action: 'addEMI', ...emiData }),
+      [sheetFetchEMI]
     );
   }
   return apiPost({ action: 'addEMI', ...emiData });
@@ -165,8 +167,10 @@ async function submitEMI(emiData) {
 
 async function updateEMI(emiData) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['emi'], () =>
-      apiPost({ action: 'updateEMI', ...emiData })
+    return writeAndSync(
+      getPin(), ['emi'],
+      () => apiPost({ action: 'updateEMI', ...emiData }),
+      [sheetFetchEMI]
     );
   }
   return apiPost({ action: 'updateEMI', ...emiData });
@@ -174,8 +178,10 @@ async function updateEMI(emiData) {
 
 async function deleteEMI(rowIndex) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['emi'], () =>
-      apiPost({ action: 'deleteEMI', rowIndex })
+    return writeAndSync(
+      getPin(), ['emi'],
+      () => apiPost({ action: 'deleteEMI', rowIndex }),
+      [sheetFetchEMI]
     );
   }
   return apiPost({ action: 'deleteEMI', rowIndex });
@@ -183,8 +189,10 @@ async function deleteEMI(rowIndex) {
 
 async function submitTransfer(transferData) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['accounts'], () =>
-      apiPost({ action: 'addTransfer', ...transferData })
+    return writeAndSync(
+      getPin(), ['accounts'],
+      () => apiPost({ action: 'addTransfer', ...transferData }),
+      [sheetFetchAccounts]
     );
   }
   return apiPost({ action: 'addTransfer', ...transferData });
@@ -192,8 +200,10 @@ async function submitTransfer(transferData) {
 
 async function submitSIP(sipData) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['sip'], () =>
-      apiPost({ action: 'addSIP', ...sipData })
+    return writeAndSync(
+      getPin(), ['sip'],
+      () => apiPost({ action: 'addSIP', ...sipData }),
+      [sheetFetchSIP]
     );
   }
   return apiPost({ action: 'addSIP', ...sipData });
@@ -201,17 +211,23 @@ async function submitSIP(sipData) {
 
 async function deleteSIP(rowIndex) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['sip'], () =>
-      apiPost({ action: 'deleteSIP', rowIndex })
+    return writeAndSync(
+      getPin(), ['sip'],
+      () => apiPost({ action: 'deleteSIP', rowIndex }),
+      [sheetFetchSIP]
     );
   }
   return apiPost({ action: 'deleteSIP', rowIndex });
 }
 
 async function updateExpense(data) {
+  const sheetName = data.sheet;
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), ['accounts'], () =>
-      apiPost({ action: 'updateExpense', ...data })
+    return writeAndSync(
+      getPin(),
+      [`expenses_${sheetName}`, 'accounts'],
+      () => apiPost({ action: 'updateExpense', ...data }),
+      [() => sheetFetchExpenses(sheetName), sheetFetchAccounts]
     );
   }
   return apiPost({ action: 'updateExpense', ...data });
@@ -219,11 +235,26 @@ async function updateExpense(data) {
 
 async function deleteExpenseEntry(sheet, rowIndex) {
   if (isFirebaseReady()) {
-    return writeAndInvalidate(getPin(), [`expenses_${sheet}`, 'accounts'], () =>
-      apiPost({ action: 'deleteExpense', sheet, rowIndex })
+    return writeAndSync(
+      getPin(),
+      [`expenses_${sheet}`, 'accounts'],
+      () => apiPost({ action: 'deleteExpense', sheet, rowIndex }),
+      [() => sheetFetchExpenses(sheet), sheetFetchAccounts]
     );
   }
   return apiPost({ action: 'deleteExpense', sheet, rowIndex });
+}
+
+// Force sync all data from Sheets to Firebase (used by refresh button)
+async function forceSyncAll(sheetName) {
+  if (!isFirebaseReady()) return;
+  const pin = getPin();
+  await Promise.all([
+    syncFromSheets(pin, `expenses_${sheetName}`, () => sheetFetchExpenses(sheetName)),
+    syncFromSheets(pin, 'accounts', sheetFetchAccounts),
+    syncFromSheets(pin, 'emi', sheetFetchEMI),
+    syncFromSheets(pin, 'sip', sheetFetchSIP)
+  ]);
 }
 
 async function verifyLogin(pin) {
@@ -238,4 +269,4 @@ async function verifyLogin(pin) {
   return data.status === 'ok';
 }
 
-export { fetchMonthlyExpenses, fetchAccounts, fetchEMI, fetchSIP, submitExpense, submitEMI, updateEMI, deleteEMI, submitSIP, deleteSIP, updateExpense, deleteExpenseEntry, submitTransfer, verifyLogin };
+export { fetchMonthlyExpenses, fetchAccounts, fetchEMI, fetchSIP, submitExpense, submitEMI, updateEMI, deleteEMI, submitSIP, deleteSIP, updateExpense, deleteExpenseEntry, submitTransfer, forceSyncAll, verifyLogin };

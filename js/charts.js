@@ -28,6 +28,9 @@ function renderPieChart(canvasId, categoryTotals) {
 
   if (labels.length === 0) return;
 
+  // If chart already exists with same data, skip re-render to avoid animation
+  if (pieChartInstance && pieChartInstance._lastData === JSON.stringify(data)) return;
+
   pieChartInstance = new Chart(canvas, {
     type: 'doughnut',
     data: {
@@ -43,6 +46,7 @@ function renderPieChart(canvasId, categoryTotals) {
       responsive: true,
       maintainAspectRatio: true,
       cutout: '60%',
+      animation: { duration: 600 },
       plugins: {
         legend: {
           position: 'bottom',
@@ -51,16 +55,18 @@ function renderPieChart(canvasId, categoryTotals) {
       }
     }
   });
+  pieChartInstance._lastData = JSON.stringify(data);
 }
 
 function renderLineChart(canvasId, monthlyData) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  if (lineChartInstance) lineChartInstance.destroy();
-
   const labels = monthlyData.map(d => d.month);
   const data = monthlyData.map(d => d.total);
+
+  if (lineChartInstance && lineChartInstance._lastData === JSON.stringify(data)) return;
+  if (lineChartInstance) lineChartInstance.destroy();
 
   lineChartInstance = new Chart(canvas, {
     type: 'line',
@@ -101,13 +107,12 @@ function renderLineChart(canvasId, monthlyData) {
       }
     }
   });
+  lineChartInstance._lastData = JSON.stringify(data);
 }
 
 function renderBarChart(canvasId, categoryTotals, prevCategoryTotals) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
-
-  if (barChartInstance) barChartInstance.destroy();
 
   const allCategories = [...new Set([
     ...Object.keys(categoryTotals),
@@ -115,6 +120,10 @@ function renderBarChart(canvasId, categoryTotals, prevCategoryTotals) {
   ])];
 
   if (allCategories.length === 0) return;
+
+  const barDataKey = JSON.stringify([categoryTotals, prevCategoryTotals]);
+  if (barChartInstance && barChartInstance._lastData === barDataKey) return;
+  if (barChartInstance) barChartInstance.destroy();
 
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
@@ -167,6 +176,7 @@ function renderBarChart(canvasId, categoryTotals, prevCategoryTotals) {
       }
     }
   });
+  barChartInstance._lastData = barDataKey;
 }
 
 export { renderPieChart, renderLineChart, renderBarChart };
