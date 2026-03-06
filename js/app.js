@@ -371,11 +371,15 @@ function renderTransactions(transactions, sheetName) {
 
   tbody.innerHTML = recent.map(t => {
     const isIncome = t.type.toLowerCase() === 'income';
+    const isTransfer = (t.category || '').toLowerCase() === 'transfer';
+    const badgeClass = isTransfer ? 'tx-transfer' : isIncome ? 'tx-income' : 'tx-expense';
+    const amountClass = isTransfer ? 'amount-muted' : isIncome ? 'amount-green' : '';
+    const amountPrefix = isTransfer ? '' : isIncome ? '+' : '';
     return `
-    <tr>
+    <tr class="${isTransfer ? 'tx-row-transfer' : ''}">
       <td>${escapeHtml(t.date)}</td>
-      <td><span class="tx-badge ${isIncome ? 'tx-income' : 'tx-expense'}">${escapeHtml(t.category)}</span></td>
-      <td class="${isIncome ? 'amount-green' : ''}">${isIncome ? '+' : ''}${formatCurrency(t.amount)}</td>
+      <td><span class="tx-badge ${badgeClass}">${escapeHtml(t.category)}</span>${isTransfer ? `<small class="tx-sub">${escapeHtml(t.subCategory || '')}</small>` : ''}</td>
+      <td class="${amountClass}">${amountPrefix}${formatCurrency(t.amount)}</td>
       <td>${escapeHtml(t.notes || t.subCategory || '-')}</td>
       <td class="tx-actions">
         <button class="tx-edit-btn" data-row="${t.rowIndex}" data-sheet="${escapeHtml(sheetName)}"

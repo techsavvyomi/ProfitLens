@@ -1,13 +1,17 @@
+function isTransfer(t) {
+  return (t.category || '').toLowerCase() === 'transfer';
+}
+
 function getTotalExpenses(transactions) {
   return transactions
-    .filter(t => t.type.toLowerCase() === 'expense')
+    .filter(t => t.type.toLowerCase() === 'expense' && !isTransfer(t))
     .reduce((sum, t) => sum + t.amount, 0);
 }
 
 function getCategoryTotals(transactions) {
   const totals = {};
   transactions
-    .filter(t => t.type.toLowerCase() === 'expense')
+    .filter(t => t.type.toLowerCase() === 'expense' && !isTransfer(t))
     .forEach(t => {
       const cat = t.category || 'Other';
       totals[cat] = (totals[cat] || 0) + t.amount;
@@ -27,6 +31,9 @@ function getMonthlySummary(transactions) {
   transactions.forEach(t => {
     const type = t.type.toLowerCase();
     const cat = t.category.toLowerCase();
+
+    // Skip transfers — they're internal movements, not real income/expense
+    if (cat === 'transfer') return;
 
     if (type === 'expense') {
       summary.totalExpense += t.amount;

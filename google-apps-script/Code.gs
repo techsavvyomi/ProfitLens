@@ -60,7 +60,13 @@ function doGet(e) {
         return jsonResponse(getSheetData('SIP'));
 
       case 'write':
-        return handleWrite(e.parameter.payload);
+        var result = handleWrite(e.parameter.payload);
+        try { updateCurrentBalances(); } catch(ignore) {}
+        return result;
+
+      case 'updateBalances':
+        updateCurrentBalances();
+        return jsonResponse({ status: 'ok' });
 
       default:
         return jsonResponse({ error: 'Unknown action: ' + action });
@@ -354,6 +360,80 @@ function addTransferRow(data) {
 }
 
 // ============================================
+// CURRENT BALANCE COMPUTATION
+// ============================================
+
+function updateCurrentBalances() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var accountsSheet = ss.getSheetByName('Accounts');
+  if (!accountsSheet) return;
+
+  var lastRow = accountsSheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var headers = accountsSheet.getRange(1, 1, 1, accountsSheet.getLastColumn()).getValues()[0];
+
+  // Ensure CurrentBalance and LastUpdated columns exist
+  var cbCol = headers.indexOf('CurrentBalance');
+  var luCol = headers.indexOf('LastUpdated');
+  if (cbCol === -1) {
+    cbCol = headers.length;
+    accountsSheet.getRange(1, cbCol + 1).setValue('CurrentBalance');
+  }
+  if (luCol === -1) {
+    luCol = Math.max(cbCol + 1, headers.length);
+    accountsSheet.getRange(1, luCol + 1).setValue('LastUpdated');
+  }
+
+  // Read accounts
+  var accountData = accountsSheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  var balances = {};
+  accountData.forEach(function(row) {
+    balances[row[0]] = parseFloat(row[2]) || 0; // Start with OpeningBalance
+  });
+
+  // Read all monthly expense sheets and compute balances
+  var sheets = ss.getSheets();
+  var monthPattern = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{4}$/;
+
+  sheets.forEach(function(sheet) {
+    var name = sheet.getName();
+    if (!monthPattern.test(name)) return;
+
+    var sLastRow = sheet.getLastRow();
+    if (sLastRow < 2) return;
+
+    var data = sheet.getRange(2, 1, sLastRow - 1, 7).getValues();
+    data.forEach(function(row) {
+      var account = row[3]; // Account column
+      var amount = parseFloat(row[4]) || 0;
+      var type = (row[5] || '').toString().toLowerCase();
+
+      if (!account || !balances.hasOwnProperty(account)) return;
+
+      if (type === 'expense') {
+        balances[account] -= amount;
+      } else if (type === 'income' || type === 'credit') {
+        balances[account] += amount;
+      }
+    });
+  });
+
+  // Write current balances and timestamp
+  var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+  for (var i = 0; i < accountData.length; i++) {
+    var accName = accountData[i][0];
+    var bal = balances[accName] || 0;
+    accountsSheet.getRange(i + 2, cbCol + 1).setValue(Math.round(bal * 100) / 100);
+    accountsSheet.getRange(i + 2, luCol + 1).setValue(now);
+  }
+
+  // Format columns
+  accountsSheet.getRange(2, cbCol + 1, accountData.length, 1).setNumberFormat('#,##0.00');
+  accountsSheet.autoResizeColumns(cbCol + 1, 2);
+}
+
+// ============================================
 // INITIAL SETUP - Run once
 // ============================================
 
@@ -361,12 +441,12 @@ function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   createSheetIfNotExists(ss, 'Accounts',
-    ['Account', 'Type', 'OpeningBalance'],
+    ['Account', 'Type', 'OpeningBalance', 'CurrentBalance', 'LastUpdated'],
     [
-      ['HDFC', 'Savings', '0'],
-      ['ICICI', 'Savings', '0'],
-      ['SBI', 'Savings', '0'],
-      ['CreditCard', 'Credit', '0']
+      ['HDFC', 'Savings', '0', '0', ''],
+      ['ICICI', 'Savings', '0', '0', ''],
+      ['SBI', 'Savings', '0', '0', ''],
+      ['CreditCard', 'Credit', '0', '0', '']
     ]
   );
 
@@ -519,6 +599,7 @@ function onOpen() {
     .addItem('Set Monthly Auto-Create', 'createMonthlyTrigger')
     .addSeparator()
     .addItem('Monthly Summary', 'showMonthlySummary')
+    .addItem('Update Current Balances', 'updateCurrentBalances')
     .addToUi();
 }
 
