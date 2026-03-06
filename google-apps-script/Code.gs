@@ -107,6 +107,14 @@ function doPost(e) {
         deleteExpenseRow(data);
         return jsonResponse({ status: 'ok' });
 
+      case 'updateEMI':
+        updateEMIRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'addTransfer':
+        addTransferRow(data);
+        return jsonResponse({ status: 'ok' });
+
       default:
         return jsonResponse({ error: 'Unknown action' });
     }
@@ -147,6 +155,14 @@ function handleWrite(payload) {
 
       case 'deleteExpense':
         deleteExpenseRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'updateEMI':
+        updateEMIRow(data);
+        return jsonResponse({ status: 'ok' });
+
+      case 'addTransfer':
+        addTransferRow(data);
         return jsonResponse({ status: 'ok' });
 
       default:
@@ -226,14 +242,16 @@ function addEMIRow(data) {
   let sheet = ss.getSheetByName('EMI');
   if (!sheet) {
     sheet = createSheetIfNotExists(ss, 'EMI',
-      ['Name', 'LoanAmount', 'EMI', 'StartDate', 'TenureMonths'], []);
+      ['Name', 'LoanAmount', 'EMI', 'StartDate', 'TenureMonths', 'DeductionDay', 'Account'], []);
   }
   sheet.appendRow([
     data.name || '',
     parseFloat(data.loanAmount) || 0,
     parseFloat(data.emi) || 0,
     data.startDate || '',
-    parseInt(data.tenureMonths) || 0
+    parseInt(data.tenureMonths) || 0,
+    data.deductionDay || '',
+    data.account || ''
   ]);
 }
 
@@ -293,6 +311,48 @@ function deleteSheetRow(sheetName, rowIndex) {
   sheet.deleteRow(actualRow);
 }
 
+function updateEMIRow(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('EMI');
+  if (!sheet) throw new Error('EMI sheet not found');
+  var actualRow = parseInt(data.rowIndex) + 2;
+  if (actualRow < 2 || actualRow > sheet.getLastRow()) {
+    throw new Error('Invalid row index');
+  }
+  sheet.getRange(actualRow, 1, 1, 7).setValues([[
+    data.name || '',
+    parseFloat(data.loanAmount) || 0,
+    parseFloat(data.emi) || 0,
+    data.startDate || '',
+    parseInt(data.tenureMonths) || 0,
+    data.deductionDay || '',
+    data.account || ''
+  ]]);
+}
+
+function addTransferRow(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var monthName = getCurrentMonthName();
+  var sheet = ss.getSheetByName(monthName);
+  if (!sheet) sheet = createExpenseSheet(ss, monthName);
+
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  var amount = parseFloat(data.amount) || 0;
+  var notes = data.notes || '';
+
+  // Debit from source account
+  sheet.appendRow([
+    today, 'Transfer', 'To ' + data.toAccount, data.fromAccount,
+    amount, 'Expense', notes ? notes : 'Transfer to ' + data.toAccount
+  ]);
+
+  // Credit to destination account
+  sheet.appendRow([
+    today, 'Transfer', 'From ' + data.fromAccount, data.toAccount,
+    amount, 'Income', notes ? notes : 'Transfer from ' + data.fromAccount
+  ]);
+}
+
 // ============================================
 // INITIAL SETUP - Run once
 // ============================================
@@ -311,9 +371,9 @@ function setupSpreadsheet() {
   );
 
   createSheetIfNotExists(ss, 'EMI',
-    ['Name', 'LoanAmount', 'EMI', 'StartDate', 'TenureMonths'],
+    ['Name', 'LoanAmount', 'EMI', 'StartDate', 'TenureMonths', 'DeductionDay', 'Account'],
     [
-      ['Sample Loan', '500000', '15000', '2025-01-01', '36']
+      ['Sample Loan', '500000', '15000', '2025-01-01', '36', '5', 'HDFC']
     ]
   );
 
